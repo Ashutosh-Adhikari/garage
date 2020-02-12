@@ -5,6 +5,7 @@ import datetime
 import enum
 import functools
 import gc
+import inspect
 import json
 import os
 import os.path as osp
@@ -232,6 +233,43 @@ def _make_sequential_log_dir(log_dir):
             i += 1
 
 
+def _make_experiment_signature(function):
+    """Generate an ExperimentTemplate's signature from its function.
+
+    Checks that the first parameter is named ctxt and removes it from the
+    signature. Makes all other parameters keyword only.
+
+    Args:
+        function (callable[ExperimentContext, ...]): The wrapped function.
+
+    Returns:
+        inspect.Signature: The signature of the ExperimentTemplate.
+
+    Raises:
+        ValueError: If the wrapped function's first parameter is not 'ctxt'.
+
+    """
+    func_sig = inspect.signature(function)
+    new_params = []
+    is_first_param = True
+    for param in func_sig.parameters.values():
+        if is_first_param:
+            # Don't output it to the experiment params, since it will contain
+            # the context.
+            if param.name != 'ctxt':
+                raise ValueError('Experiment functions should have a first '
+                                 'parameter named ctxt')
+            is_first_param = False
+        else:
+            new_params.append(
+                inspect.Parameter(name=param.name,
+                                  kind=inspect.Parameter.KEYWORD_ONLY,
+                                  default=param.default,
+                                  annotation=param.annotation))
+    return inspect.Signature(new_params,
+                             return_annotation=func_sig.return_annotation)
+
+
 class ExperimentContext:
     """Context in which an experiment is being run.
 
@@ -308,7 +346,19 @@ class ExperimentTemplate:
         self.snapshot_gap = snapshot_gap
         self.archive_launch_repo = archive_launch_repo
         if self.function is not None:
-            functools.update_wrapper(self, self.function)
+            self._update_wrap_params()
+
+    def _update_wrap_params(self):
+        """Update self to "look like" the wrapped funciton.
+
+        Mostly, this involves creating a function signature for the
+        ExperimentTemplate that looks like the wrapped function, but with the
+        first argument (ctxt) excluded, and all other arguments required to be
+        keyword only.
+
+        """
+        functools.update_wrapper(self, self.function)
+        self.__signature__ = _make_experiment_signature(self.function)
 
     def _make_context(self, *args, **kwargs):
         """Make a context from the template information and variant args.
@@ -388,7 +438,7 @@ class ExperimentTemplate:
                                  'wrap_experiment() to a single function')
             # Apply ourselves as a decorator
             self.function = args[0]
-            functools.update_wrapper(self, self.function)
+            self._update_wrap_params()
             return self
         else:
             ctxt = self._make_context(*args, **kwargs)

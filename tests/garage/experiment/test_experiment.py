@@ -52,8 +52,6 @@ def test_experiment_with_variant():
     assert exp_folder_name.startswith('test_prefix')
 
 
-# Pylint gets confused by @wrap_experiment adding an argument.
-# pylint: disable=no-value-for-parameter
 def test_wrap_experiment_makes_log_dir():
     prefix = 'wrap_exp_test_prefix'
     exp_path = pathlib.Path(os.getcwd(), 'data/local', prefix)
@@ -61,7 +59,7 @@ def test_wrap_experiment_makes_log_dir():
     expected_path = exp_path / 'test_exp'
 
     @wrap_experiment(prefix=prefix)
-    def test_exp(ctxt):
+    def test_exp(ctxt=None):
         assert expected_path.samefile(ctxt.snapshot_dir)
 
     with pytest.raises(FileNotFoundError):
@@ -92,3 +90,12 @@ def test_wrap_experiment_makes_log_dir():
     assert any([
         expected_path.samefile(directory) for directory in new_folder_contents
     ])
+
+
+def test_wrap_experiment_raises_on_non_ctxt_param_name():
+    prefix = 'wrap_exp_test_prefix2'
+    with pytest.raises(ValueError, match='named ctxt'):
+
+        @wrap_experiment(prefix=prefix)
+        def _test_exp(_snapshot_config=None):
+            pass
