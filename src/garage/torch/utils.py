@@ -1,6 +1,8 @@
 """Utility functions for PyTorch."""
 import torch
 
+device = None
+
 
 def np_to_torch(array_dict):
     """Convert numpy arrays to PyTorch tensors.
@@ -76,3 +78,21 @@ def update_module_params(module, new_params):  # noqa: D202
                 update(named_modules[module_name], param_name, new_param)
         else:
             update(module, name, new_param)
+
+
+def from_numpy(array):
+    """Creates a Tensor from a :class:`numpy.ndarray`.
+
+    The returned tensor and ndarray share the same memory. Modifications to
+    the tensor will be reflected in the ndarray and vice versa. The returned
+    tensor is not resizable.
+
+    Args:
+        array(:class:`numpy.ndarray`): array to be converted to a
+            :class:`torch.Tensor`.
+
+    Return:
+        :class:`torch.Tensor`: The passed :class:`ndarray` converted into
+            a :class:`torch.Tensor`.
+    """
+    return torch.from_numpy(array).float().to(device)

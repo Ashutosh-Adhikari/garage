@@ -120,12 +120,30 @@ class GaussianMLPBaseModule(nn.Module):
             self._init_std = torch.nn.Parameter(init_std_param)
         else:
             self._init_std = init_std_param
+            self.register_buffer('init_std', self._init_std)
 
         self._min_std_param = self._max_std_param = None
         if min_std is not None:
             self._min_std_param = torch.Tensor([min_std]).log()
+            self.register_buffer('min_std_param', self._min_std_param)
         if max_std is not None:
             self._max_std_param = torch.Tensor([max_std]).log()
+            self.register_buffer('max_std_param', self._max_std_param)
+
+    def to(self, *args, **kwargs):
+        """Move the module to the specified device.
+
+        Args:
+            *args: args to pytorch to function.
+            **kwargs: keyword args to pytorch to function.
+
+        """
+        super().to(*args, **kwargs)
+        buffers = dict(self.named_buffers())
+        if not isinstance(self._init_std, torch.nn.Parameter):
+            self._init_std = buffers['init_std']
+        self._min_std_param = buffers['min_std_param']
+        self._max_std_param = buffers['max_std_param']
 
     @abc.abstractmethod
     def _get_mean_and_log_std(self, *inputs):
